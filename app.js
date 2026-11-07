@@ -59,3 +59,62 @@ window.addEventListener('storage',e=>{if(e.key===K){data=load();render()}});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;const b=document.querySelector('#installBtn');b.hidden=false;b.onclick=async()=>{installPrompt.prompt();installPrompt=null;b.hidden=true}});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 initSync();render();
+/\* Familienkueche Einkaufslisten-Erweiterung 2.0. Am ENDE von app.js einfuegen. \*/
+(function(){
+  const oldApplyPlan=applyPlan;
+  const oldBind=bind;
+  const oldItem=item;
+  const oldShoppingView=shoppingView;
+  const ownKey='familienplan-own-shopping-v2';
+  function ensure(){
+	if(!data.customShopping || typeof data.customShopping!=='object')data.customShopping={categories:[],items:[],quantities:{},removed:[]};
+	const s=data.customShopping;
+	s.categories=Array.isArray(s.categories)?s.categories:[];
+	s.items=Array.isArray(s.items)?s.items:[];
+	s.quantities=s.quantities&&typeof s.quantities==='object'?s.quantities:{};
+	s.removed=Array.isArray(s.removed)?s.removed:[];
+	return s;
+  }
+  function persist(){localStorage.setItem(ownKey,JSON.stringify(ensure()));save();render()}
+  function migrate(){
+	const s=ensure();
+	try{const saved=JSON.parse(localStorage.getItem(ownKey)||'null');if(saved){
+	  s.categories=[...new Set([...(saved.categories||[]),...s.categories])];
+	  s.items=[...(saved.items||[]),...s.items.filter(x=>!(saved.items||[]).some(y=>y.id===x.id))];
+	  s.quantities={...(saved.quantities||{}),...s.quantities};
+	  s.removed=[...new Set([...(saved.removed||[]),...s.removed])];
+	}}catch{}
+	if(Array.isArray(data.extra)&&data.extra.length){data.extra.forEach((x,i)=>{if(!s.items.some(y=>y.name===x.name&&y.qty===x.qty))s.items.push({id:'legacy-'+Date.now()+'-'+i,name:x.name,qty:x.qty,category:'Eigene Artikel'})});data.extra=[]}
+	localStorage.setItem(ownKey,JSON.stringify(s));save(true);
+  }
+  const safe=s=\>esc(s);
+  const id=()=\> 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  function rows(){
+	const s=ensure(),groups={};
+	Object.entries(currentGroceries()).forEach(([cat,items])=>{groups[cat]=items.map(([name,qty],index)=>({key:'g-'+name,name,qty:s.quantities['g-'+name]??qty,cat,custom:false,index})).filter(x=>!s.removed.includes(x.key))});
+	s.categories.forEach(cat=>{if(!groups[cat])groups[cat]=[]});
+	s.items.forEach((x,index)=>{if(!groups[x.category])groups[x.category]=[];groups[x.category].push({key:'x-'+x.id,name:x.name,qty:x.qty,cat:x.category,custom:true,index})});
+	Object.values(groups).forEach(items=>items.sort((a,b)=>Number(data.checked.includes(a.key))-Number(data.checked.includes(b.key))||a.index-b.index));
+	return groups;
+  }
+  function categoryOptions(selected){return Object.keys(rows()).map(x=\>`<option value="${safe(x)}" ${x===selected?'selected':''}>${safe(x)}</option>`).join('')}
+  shoppingView=function(){const groups=rows();const total=Object.values(groups).reduce((n,x)=\>n+x.length,0),done=Object.values(groups).flat().filter(x=\>data.checked.includes(x.key)).length;
+	return `<section class="card"><h2>Einkaufsliste</h2><p class="muted">${done} von ${total} Artikeln abgehakt</p><div class="progress"><i style="width:${total?done/total*100:0}%"></i></div><div class="tools"><button id="addItem">+ Artikel</button><button id="addCategory">+ Kategorie</button><button id="clearChecks">Häkchen löschen</button><button id="exportBtn">Liste teilen</button></div>${Object.entries(groups).map(([cat,items])=>`<details class="group" open><summary>${safe(cat)} (${items.length})</summary><ul class="list">${items.map(x=>`<li class="${data.checked.includes(x.key)?'checked':''}"><input type="checkbox" aria-label="${safe(x.name)} abhaken" data-check="${safe(x.key)}" ${data.checked.includes(x.key)?'checked':''}><label>${safe(x.name)}</label><span class="qty">${safe(x.qty)}</span><button class="tiny" data-qty="${safe(x.key)}" aria-label="${safe(x.name)} bearbeiten">✎</button><button class="tiny" data-del="${safe(x.key)}" aria-label="${safe(x.name)} entfernen">×</button></li>`).join('')}</ul></details>`).join('')}<p class="muted">Eigene Artikel und Kategorien bleiben bei einem neuen Wochenplan erhalten. Änderungen werden bei aktiver Anmeldung synchronisiert.</p></section>`};
+  bind=function(){oldBind();
+	document.querySelector('#addItem')?.replaceWith(document.querySelector('#addItem').cloneNode(true));
+	document.querySelector('#addItem')?.addEventListener('click',()=>{const name=prompt('Artikelname:');if(!name?.trim())return;const qty=prompt('Menge:','1 Stück');if(qty===null)return;const cats=Object.keys(rows());const cat=prompt('Kategorie (vorhanden: '+cats.join(', ')+'):',cats[0]||'Sonstiges');if(!cat?.trim())return;const s=ensure();if(!cats.includes(cat.trim())&&!s.categories.includes(cat.trim()))s.categories.push(cat.trim());s.items.push({id:id(),name:name.trim(),qty:qty.trim(),category:cat.trim()});persist()});
+	document.querySelector('#addCategory')?.addEventListener('click',()=>{const cat=prompt('Name der neuen Kategorie:');if(!cat?.trim())return;const s=ensure();if(Object.keys(rows()).includes(cat.trim()))return toast('Kategorie existiert bereits');s.categories.push(cat.trim());persist()});
+	document.querySelectorAll('[data-qty]').forEach(b=>b.addEventListener('click',()=>{const key=b.dataset.qty;const entry=Object.values(rows()).flat().find(x=>x.key===key);if(!entry)return;const qty=prompt('Neue Menge für '+entry.name+':',entry.qty);if(qty===null)return;const s=ensure();if(entry.custom){const x=s.items.find(x=>'x-'+x.id===key);if(x)x.qty=qty.trim()}else s.quantities[key]=qty.trim();persist()}));
+	document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{const key=b.dataset.del;const entry=Object.values(rows()).flat().find(x=>x.key===key);if(!entry||!confirm(entry.name+' entfernen?'))return;const s=ensure();if(entry.custom)s.items=s.items.filter(x=>'x-'+x.id!==key);else s.removed.push(key);data.checked=data.checked.filter(x=>x!==key);persist()}));
+  };
+  // Export-Button mit korrekter Ausgabe ueberschreiben.
+  const bindWithExport=bind;
+  bind=function(){bindWithExport();const b=document.querySelector('#exportBtn');if(b){const n=b.cloneNode(true);b.replaceWith(n);n.addEventListener('click',async()=\>{const str=Object.entries(rows()).map(([cat,items])=\>cat+'n'+items.map(x=\>'• '+x.name+' — '+x.qty).join('n')).join('nn');try{await navigator.clipboard.writeText(str);toast('Einkaufsliste kopiert')}catch{prompt('Einkaufsliste kopieren:',str)}})}};
+  applyPlan=function(){const before=data,old=ensure();const text=document.querySelector('#planJson').value.trim();let parsed;try{parsed=JSON.parse(text)}catch{return oldApplyPlan()}
+	if(!parsed?.plan||!days.every(d=>Array.isArray(parsed.plan[d])&&parsed.plan[d].length>=3))return oldApplyPlan();
+	const preserved=structuredClone(old);oldApplyPlan();if(data!==before){data.customShopping=preserved;data.checked=[];localStorage.setItem(ownKey,JSON.stringify(preserved));save();render()}
+  };
+  document.querySelector('#applyPlan').onclick=applyPlan;
+  migrate();render();
+})();
+
