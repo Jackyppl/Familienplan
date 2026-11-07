@@ -30,91 +30,173 @@ const recipes=[
 const K='familienplan-pwa-v1';let data=load();let activeView='plan';let supa=null;let authUser=null;let cloudTimer;let installPrompt=null;let cloudChannel=null;let lastSyncedAt=null;
 function load(){try{return {...structuredClone(base),...JSON.parse(localStorage.getItem(K)||'{}')}}catch{return structuredClone(base)}}
 function save(localOnly=false){localStorage.setItem(K,JSON.stringify(data));if(!localOnly&&supa&&authUser){clearTimeout(cloudTimer);cloudTimer=setTimeout(syncUp,700)}}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function render(){document.querySelector('#weekTitle').textContent='Familienküche · '+(data.weekTitle||'Wochenübersicht');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===activeView));const el=document.querySelector('#view');el.innerHTML=activeView==='plan'?planView():activeView==='shopping'?shoppingView():recipeView();bind()}
-function planView(){return `<div class="layout"><section>${days.map(d=>`<article class="daycard"><div class="dayhead"><h2>${d}</h2><span class="muted">2 Erwachsene + Kinderportion</span></div>${data.plan[d].map((m,i)=>{const key=d+'-'+i;return `<div class="meal"><div class="mealtype">${esc(m[0])}</div><div><span class="mealname">${esc(data.names[key]||m[1])}</span><span class="mealnote">${esc(data.notes[key]||m[2])}</span>${i===2?'<span class="badge">Familienessen</span>':''}</div><button class="tiny" data-edit="${key}">Ändern</button></div>`}).join('')}</article>`).join('')}</section><aside><div class="notice"><strong>Für eure Tochter mitgedacht</strong><p>Bei gemeinsamen Gerichten Kinderportion vor dem Salzen entnehmen. Weiche, gut greifbare Stücke anbieten, harte und runde Lebensmittel sicher vorbereiten und beim Essen aufrecht sowie beaufsichtigt sitzen lassen.</p></div><section class="card"><h2>So passt es in euren Alltag</h2><p class="muted">Werktags ist Mamas Frühstück und Mittagessen to go eingeplant. Eure Tochter bekommt Frühstück für die Tagesmutter und isst dort Mittag. Papa isst Frühstück und Mittag zu Hause. Abends und am Wochenende plant ihr gemeinsame Familiengerichte.</p><p class="muted">Reste rasch abkühlen und gekühlt lagern. Reis besonders schnell kühlen und am Folgetag gründlich erhitzen.</p></section></aside></div>`}
+function esc(s){return String(s??'').replace(/[&\<\>"']/g,c=\>({'&':'&amp;','\<':'&lt;','\>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){document.querySelector('#weekTitle').textContent='Familienküche · '+(data.weekTitle||'Wochenübersicht');document.querySelectorAll('.nav button').forEach(b=\>b.classList.toggle('active',b.dataset.view===activeView));const el=document.querySelector('#view');el.innerHTML=activeView==='plan'?planView():activeView==='shopping'?shoppingView():recipeView();bind()}
+function planView(){return `<div class="layout"><section>${days.map(d=>`<article class="daycard"><div class="dayhead"><h2>${d}</h2><span class="muted">2 Erwachsene + Kinderportion</span></div>${data.plan[d].map((m,i)=\>{const key=d+'-'+i;return `<div class="meal"><div class="mealtype">${esc(m[0])}</div><div><span class="mealname">${esc(data.names[key]||m[1])}</span><span class="mealnote">${esc(data.notes[key]||m[2])}</span>${i===2?'<span class="badge">Familienessen</span>':''}</div><button class="tiny" data-edit="${key}">Ändern</button></div>`}).join('')}</article>`).join('')}</section><aside><div class="notice"><strong>Für eure Tochter mitgedacht</strong><p>Bei gemeinsamen Gerichten Kinderportion vor dem Salzen entnehmen. Weiche, gut greifbare Stücke anbieten, harte und runde Lebensmittel sicher vorbereiten und beim Essen aufrecht sowie beaufsichtigt sitzen lassen.</p></div><section class="card"><h2>So passt es in euren Alltag</h2><p class="muted">Werktags ist Mamas Frühstück und Mittagessen to go eingeplant. Eure Tochter bekommt Frühstück für die Tagesmutter und isst dort Mittag. Papa isst Frühstück und Mittag zu Hause. Abends und am Wochenende plant ihr gemeinsame Familiengerichte.</p><p class="muted">Reste rasch abkühlen und gekühlt lagern. Reis besonders schnell kühlen und am Folgetag gründlich erhitzen.</p></section></aside></div>`}
 function currentGroceries(){return data.groceries||groceries}
 function currentRecipes(){return data.recipes||recipes}
-function shoppingView(){const itemsByGroup=currentGroceries();let total=Object.values(itemsByGroup).reduce((n,a)=>n+a.length,0)+data.extra.length,done=data.checked.length;return `<div class="layout"><section class="card"><h2>Einkaufsliste</h2><div class="muted"><span>${done}</span> von ${total} Artikeln abgehakt</div><div class="progress"><i style="width:${total?done/total*100:0}%"></i></div><div class="tools"><button id="addItem">+ Artikel</button><button id="clearChecks">Häkchen löschen</button><button id="exportBtn">Liste teilen</button></div>${Object.entries(itemsByGroup).map(([group,items])=>`<details class="group" open><summary>${group}</summary><ul class="list">${items.map(([name,qty])=>item(name,qty)).join('')}</ul></details>`).join('')}${data.extra.length?`<details class="group" open><summary>Eigene Artikel</summary><ul class="list">${data.extra.map(x=>item(x.name,x.qty,true)).join('')}</ul></details>`:''}<p class="muted">Mengen sind grob auf den Plan gerechnet. Prüft Vorräte, Packungsgrößen und Angebote; Öl und Gewürze sind größtenteils als Vorrat angenommen.</p></section><aside><div class="notice"><strong>Budget: ca. 112 € von 125 €</strong><p>Preisrichtwert ohne aktuelle Angebote. Je nach Laden, Saison und Vorräten kann der Betrag abweichen.</p></div><section class="card"><h2>Vorbereitung</h2><p class="muted">Am Vorabend Frühstück und Lunchbox vorbereiten. Zutaten mehrfach nutzen: Äpfel und Birnen für Oats und Snacks, Gemüse für Wraps, Quesadillas und Abendessen. Reste beschriften und innerhalb von 1–2 Tagen verbrauchen.</p></section></aside></div>`}
+function shoppingView(){const itemsByGroup=currentGroceries();let total=Object.values(itemsByGroup).reduce((n,a)=\>n+a.length,0)+data.extra.length,done=data.checked.length;return `<div class="layout"><section class="card"><h2>Einkaufsliste</h2><div class="muted"><span>${done}</span> von ${total} Artikeln abgehakt</div><div class="progress"><i style="width:${total?done/total*100:0}%"></i></div><div class="tools"><button id="addItem">+ Artikel</button><button id="clearChecks">Häkchen löschen</button><button id="exportBtn">Liste teilen</button></div>${Object.entries(itemsByGroup).map(([group,items])=>`<details class="group" open><summary>${group}</summary><ul class="list">${items.map(([name,qty])=\>item(name,qty)).join('')}</ul></details>`).join('')}${data.extra.length?`<details class="group" open><summary>Eigene Artikel</summary><ul class="list">${data.extra.map(x=\>item(x.name,x.qty,true)).join('')}</ul></details>`:''}<p class="muted">Mengen sind grob auf den Plan gerechnet. Prüft Vorräte, Packungsgrößen und Angebote; Öl und Gewürze sind größtenteils als Vorrat angenommen.</p></section><aside><div class="notice"><strong>Budget: ca. 112 € von 125 €</strong><p>Preisrichtwert ohne aktuelle Angebote. Je nach Laden, Saison und Vorräten kann der Betrag abweichen.</p></div><section class="card"><h2>Vorbereitung</h2><p class="muted">Am Vorabend Frühstück und Lunchbox vorbereiten. Zutaten mehrfach nutzen: Äpfel und Birnen für Oats und Snacks, Gemüse für Wraps, Quesadillas und Abendessen. Reste beschriften und innerhalb von 1–2 Tagen verbrauchen.</p></section></aside></div>`}
 function item(name,qty,extra=false){let key=extra?'x-'+name:'g-'+name,checked=data.checked.includes(key);return `<li class="${checked?'checked':''}"><input type="checkbox" data-check="${esc(key)}" ${checked?'checked':''}><label>${esc(name)}</label><span class="qty">${esc(qty)}</span></li>`}
 function recipeView(){return `<div class="layout"><section class="card"><h2>Rezepte</h2><p class="muted">Kinderportion bei Bedarf vor dem Salzen abnehmen. Zeiten sind Richtwerte und die Zutatenmengen beziehen sich auf die jeweilige Rezeptportion.</p>${currentRecipes().map(([name,meta,body])=>`<details class="recipe"><summary>${esc(name)}</summary><div class="recipe-meta">${esc(meta)}</div><div class="recipe-body">${esc(body)}</div></details>`).join('')}</section><aside><section class="card"><h2>Alltags-Hinweise</h2><ul class="muted"><li>Kein zugesetzter Zucker; Zutatenlisten bei Brot, Teig und Aufstrichen prüfen.</li><li>Käse, Brot und Fertigteig bringen bereits Salz mit.</li><li>Für die Tochter Konsistenz und Schnittform an ihre Fähigkeiten anpassen. Bei Unsicherheit bitte individuelle Empfehlungen der Kinderarztpraxis beachten.</li></ul></section></aside></div>`}
-function bind(){document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>edit(b.dataset.edit));document.querySelectorAll('[data-check]').forEach(c=>c.onchange=()=>{const k=c.dataset.check;data.checked=c.checked?[...new Set([...data.checked,k])]:data.checked.filter(x=>x!==k);save();render()});document.querySelector('#addItem')?.addEventListener('click',addItem);document.querySelector('#clearChecks')?.addEventListener('click',()=>{data.checked=[];save();render()});document.querySelector('#exportBtn')?.addEventListener('click',shareList)}
+function bind(){document.querySelectorAll('[data-edit]').forEach(b=\>b.onclick=()=\>edit(b.dataset.edit));document.querySelectorAll('[data-check]').forEach(c=\>c.onchange=()=\>{const k=c.dataset.check;data.checked=c.checked?[...new Set([...data.checked,k])]:data.checked.filter(x=\>x!==k);save();render()});document.querySelector('#addItem')?.addEventListener('click',addItem);document.querySelector('#clearChecks')?.addEventListener('click',()=\>{data.checked=[];save();render()});document.querySelector('#exportBtn')?.addEventListener('click',shareList)}
 
-function applyPlan(){const raw=document.querySelector('#planJson').value.trim();const status=document.querySelector('#planStatus');try{const incoming=JSON.parse(raw);if(!incoming||!incoming.plan||!days.every(d=>Array.isArray(incoming.plan[d])&&incoming.plan[d].length>=3))throw new Error('Der Plan braucht alle sieben Tage mit Frühstück, Mittagessen und Abendessen.');for(const d of days){if(incoming.plan[d].some(m=>!Array.isArray(m)||m.length<2))throw new Error('Jede Mahlzeit braucht mindestens Name und Gericht.')}data={...structuredClone(base),...incoming,checked:[],extra:[],names:{},notes:{}};save();activeView='plan';render();document.querySelector('#planDialog').classList.remove('open');document.querySelector('#planJson').value='';toast('Neuer Wochenplan übernommen')}catch(e){status.textContent=e instanceof SyntaxError?'Der eingefügte Text ist nicht im erwarteten Format. Bitte den vollständigen Plantext einfügen.':e.message;status.className='status err'}}
+function applyPlan(){const raw=document.querySelector('#planJson').value.trim();const status=document.querySelector('#planStatus');try{const incoming=JSON.parse(raw);if(!incoming||!incoming.plan||!days.every(d=\>Array.isArray(incoming.plan[d])&&incoming.plan[d].length\>=3))throw new Error('Der Plan braucht alle sieben Tage mit Frühstück, Mittagessen und Abendessen.');for(const d of days){if(incoming.plan[d].some(m=\>!Array.isArray(m)||m.length\<2))throw new Error('Jede Mahlzeit braucht mindestens Name und Gericht.')}data={...structuredClone(base),...incoming,checked:[],extra:[],names:{},notes:{}};save();activeView='plan';render();document.querySelector('#planDialog').classList.remove('open');document.querySelector('#planJson').value='';toast('Neuer Wochenplan übernommen')}catch(e){status.textContent=e instanceof SyntaxError?'Der eingefügte Text ist nicht im erwarteten Format. Bitte den vollständigen Plantext einfügen.':e.message;status.className='status err'}}
 function edit(key){const [d,n]=key.split('-');const m=data.plan[d][Number(n)];const current=data.names[key]||m[1];const val=prompt('Gericht anpassen:',current);if(val&&val.trim()){data.names[key]=val.trim();const note=prompt('Hinweis oder Notiz anpassen:',data.notes[key]||m[2]);if(note!==null)data.notes[key]=note;save();render()}}
 function addItem(){const name=prompt('Was soll auf die Einkaufsliste?');if(!name?.trim())return;const qty=prompt('Menge (optional):','1 Stück')||'';data.extra.push({name:name.trim(),qty});save();render()}
-async function shareList(){const s=Object.entries(currentGroceries()).map(([g,items])=>g+'\n'+items.map(i=>'• '+i[0]+' — '+i[1]).join('\n')).join('\n\n');try{await navigator.clipboard.writeText(s);toast('Einkaufsliste kopiert')}catch{prompt('Einkaufsliste kopieren:',s)}}
-function toast(s){const t=document.querySelector('#toast');t.textContent=s;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
-document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{activeView=b.dataset.view;render()});document.querySelector('#settingsBtn').onclick=()=>document.querySelector('#settingsDialog').classList.add('open');document.querySelector('#loadPlanBtn').onclick=()=>document.querySelector('#planDialog').classList.add('open');document.querySelector('#cancelPlan').onclick=()=>document.querySelector('#planDialog').classList.remove('open');document.querySelector('#applyPlan').onclick=applyPlan;document.querySelector('#closeSettings').onclick=()=>document.querySelector('#settingsDialog').classList.remove('open');document.querySelector('#shareBtn').onclick=async()=>{let text='Unser Familien-Wochenplan\n\n'+days.map(d=>d+'\n'+data.plan[d].map((m,i)=>m[0]+': '+(data.names[d+'-'+i]||m[1])).join('\n')).join('\n\n');try{if(navigator.share)await navigator.share({title:'Unser Familienplan',text});else{await navigator.clipboard.writeText(text);toast('Plan kopiert')}}catch{}}
-document.querySelector('#saveConfig').onclick=()=>{const c={url:document.querySelector('#sbUrl').value.trim(),key:document.querySelector('#sbKey').value.trim(),email:document.querySelector('#sbEmail').value.trim()};localStorage.setItem('family-sync-config',JSON.stringify(c));initSync();setStatus('Einstellungen gespeichert. Melde dich an, um zu synchronisieren.','ok')};
+async function shareList(){const s=Object.entries(currentGroceries()).map(([g,items])=\>g+'n'+items.map(i=\>'• '+i[0]+' — '+i[1]).join('n')).join('nn');try{await navigator.clipboard.writeText(s);toast('Einkaufsliste kopiert')}catch{prompt('Einkaufsliste kopieren:',s)}}
+function toast(s){const t=document.querySelector('#toast');t.textContent=s;t.classList.add('show');setTimeout(()=\>t.classList.remove('show'),2200)}
+document.querySelectorAll('.nav button').forEach(b=\>b.onclick=()=\>{activeView=b.dataset.view;render()});document.querySelector('#settingsBtn').onclick=()=\>document.querySelector('#settingsDialog').classList.add('open');document.querySelector('#loadPlanBtn').onclick=()=\>document.querySelector('#planDialog').classList.add('open');document.querySelector('#cancelPlan').onclick=()=\>document.querySelector('#planDialog').classList.remove('open');document.querySelector('#applyPlan').onclick=applyPlan;document.querySelector('#closeSettings').onclick=()=\>document.querySelector('#settingsDialog').classList.remove('open');document.querySelector('#shareBtn').onclick=async()=\>{let text='Unser Familien-Wochenplannn'+days.map(d=\>d+'n'+data.plan[d].map((m,i)=\>m[0]+': '+(data.names[d+'-'+i]||m[1])).join('n')).join('nn');try{if(navigator.share)await navigator.share({title:'Unser Familienplan',text});else{await navigator.clipboard.writeText(text);toast('Plan kopiert')}}catch{}}
+document.querySelector('#saveConfig').onclick=()=\>{const c={url:document.querySelector('#sbUrl').value.trim(),key:document.querySelector('#sbKey').value.trim(),email:document.querySelector('#sbEmail').value.trim()};localStorage.setItem('family-sync-config',JSON.stringify(c));initSync();setStatus('Einstellungen gespeichert. Melde dich an, um zu synchronisieren.','ok')};
 function getCfg(){try{return JSON.parse(localStorage.getItem('family-sync-config')||'{}')}catch{return {}}}function setStatus(s,kind=''){const el=document.querySelector('#syncStatus');el.textContent=s;el.className='status '+kind;document.querySelector('#syncFoot').textContent=supa&&authUser?'Gemeinsam synchronisiert. Beide Smartphones sehen Änderungen nach wenigen Sekunden.':'Änderungen werden auf diesem Gerät gespeichert. Für gemeinsame Live-Synchronisierung: unter „Synchronisierung“ einmal einrichten und die gehostete App auf beiden Smartphones öffnen.'}
-function initSync(){const c=getCfg();if(c.url&&c.key&&window.supabase){supa=window.supabase.createClient(c.url,c.key);document.querySelector('#sbUrl').value=c.url;document.querySelector('#sbKey').value=c.key;document.querySelector('#sbEmail').value=c.email||'';supa.auth.getSession().then(({data:{session}})=>{authUser=session?.user||null;if(authUser){setStatus('Angemeldet als '+authUser.email+'. Synchronisierung aktiv.','ok');syncDown();watchCloud()}})}}
-document.querySelector('#signUp').onclick=async()=>{if(!supa)return setStatus('Bitte zuerst Projekt-URL und Schlüssel speichern.','err');const email=document.querySelector('#sbEmail').value.trim(),password=document.querySelector('#sbPass').value;if(!email||password.length<8)return setStatus('E-Mail eintragen und ein Passwort mit mindestens 8 Zeichen wählen.','err');const {data:d,error}=await supa.auth.signUp({email,password});if(error)return setStatus(error.message,'err');authUser=d.user;if(d.session){setStatus('Konto erstellt und angemeldet. Synchronisierung aktiv.','ok');await syncDown();watchCloud()}else setStatus('Konto angelegt. Bitte E-Mail bestätigen, dann anmelden.','ok')};
-document.querySelector('#signIn').onclick=async()=>{if(!supa)return setStatus('Bitte zuerst Projekt-URL und Schlüssel speichern.','err');const {data:d,error}=await supa.auth.signInWithPassword({email:document.querySelector('#sbEmail').value.trim(),password:document.querySelector('#sbPass').value});if(error)return setStatus(error.message,'err');authUser=d.user;setStatus('Angemeldet. Synchronisiere…','ok');await syncDown();watchCloud()};
-document.querySelector('#signOut').onclick=async()=>{if(supa)await supa.auth.signOut();authUser=null;setStatus('Abgemeldet. Daten bleiben lokal auf diesem Gerät.','')};
-async function syncDown(){if(!supa||!authUser)return;const {data:row,error}=await supa.from('family_plan').select('payload').eq('owner_id',authUser.id).maybeSingle();if(error){setStatus('Synchronisierung fehlgeschlagen: '+error.message,'err');return}if(row?.payload){data={...structuredClone(base),...row.payload};lastSyncedAt=row.updated_at;localStorage.setItem(K,JSON.stringify(data));render()}else await syncUp();setStatus('Angemeldet als '+authUser.email+'. Synchronisierung aktiv.','ok')}
-function watchCloud(){if(!supa||!authUser)return;if(cloudChannel)supa.removeChannel(cloudChannel);cloudChannel=supa.channel('family-plan-'+authUser.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'family_plan',filter:'owner_id=eq.'+authUser.id},payload=>{const row=payload.new;if(row?.payload&&row.updated_at!==lastSyncedAt){data={...structuredClone(base),...row.payload};lastSyncedAt=row.updated_at;localStorage.setItem(K,JSON.stringify(data));render();setStatus('Änderungen von einem anderen Gerät übernommen.','ok')}}).subscribe()} 
-async function syncUp(){if(!supa||!authUser)return;const timestamp=new Date().toISOString();const {error}=await supa.from('family_plan').upsert({owner_id:authUser.id,payload:data,updated_at:timestamp},{onConflict:'owner_id'});if(!error)lastSyncedAt=timestamp;if(error)setStatus('Lokale Änderung gespeichert; Cloud-Sync fehlgeschlagen: '+error.message,'err')}
-window.addEventListener('storage',e=>{if(e.key===K){data=load();render()}});
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;const b=document.querySelector('#installBtn');b.hidden=false;b.onclick=async()=>{installPrompt.prompt();installPrompt=null;b.hidden=true}});
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+function initSync(){const c=getCfg();if(c.url&&c.key&&window.supabase){supa=window.supabase.createClient(c.url,c.key);document.querySelector('#sbUrl').value=c.url;document.querySelector('#sbKey').value=c.key;document.querySelector('#sbEmail').value=c.email||'';supa.auth.getSession().then(({data:{session}})=\>{authUser=session?.user||null;if(authUser){setStatus('Angemeldet als '+authUser.email+'. Synchronisierung aktiv.','ok');syncDown();watchCloud()}})}}
+document.querySelector('#signUp').onclick=async()=\>{if(!supa)return setStatus('Bitte zuerst Projekt-URL und Schlüssel speichern.','err');const email=document.querySelector('#sbEmail').value.trim(),password=document.querySelector('#sbPass').value;if(!email||password.length\<8)return setStatus('E-Mail eintragen und ein Passwort mit mindestens 8 Zeichen wählen.','err');const {data:d,error}=await supa.auth.signUp({email,password});if(error)return setStatus(error.message,'err');authUser=d.user;if(d.session){setStatus('Konto erstellt und angemeldet. Synchronisierung aktiv.','ok');await syncDown();watchCloud()}else setStatus('Konto angelegt. Bitte E-Mail bestätigen, dann anmelden.','ok')};
+document.querySelector('#signIn').onclick=async()=\>{if(!supa)return setStatus('Bitte zuerst Projekt-URL und Schlüssel speichern.','err');const {data:d,error}=await supa.auth.signInWithPassword({email:document.querySelector('#sbEmail').value.trim(),password:document.querySelector('#sbPass').value});if(error)return setStatus(error.message,'err');authUser=d.user;setStatus('Angemeldet. Synchronisiere…','ok');await syncDown();watchCloud()};
+document.querySelector('#signOut').onclick=async()=\>{if(supa)await supa.auth.signOut();authUser=null;setStatus('Abgemeldet. Daten bleiben lokal auf diesem Gerät.','')};
+async function syncDown(){if(!supa||!authUser)return;const {data:row,error}=await supa.from('family\_plan').select('payload').eq('owner\_id',authUser.id).maybeSingle();if(error){setStatus('Synchronisierung fehlgeschlagen: '+error.message,'err');return}if(row?.payload){data={...structuredClone(base),...row.payload};lastSyncedAt=row.updated\_at;localStorage.setItem(K,JSON.stringify(data));render()}else await syncUp();setStatus('Angemeldet als '+authUser.email+'. Synchronisierung aktiv.','ok')}
+function watchCloud(){if(!supa||!authUser)return;if(cloudChannel)supa.removeChannel(cloudChannel);cloudChannel=supa.channel('family-plan-'+authUser.id).on('postgres\_changes',{event:'UPDATE',schema:'public',table:'family\_plan',filter:'owner\_id=eq.'+authUser.id},payload=\>{const row=payload.new;if(row?.payload&&row.updated\_at!==lastSyncedAt){data={...structuredClone(base),...row.payload};lastSyncedAt=row.updated\_at;localStorage.setItem(K,JSON.stringify(data));render();setStatus('Änderungen von einem anderen Gerät übernommen.','ok')}}).subscribe()} 
+async function syncUp(){if(!supa||!authUser)return;const timestamp=new Date().toISOString();const {error}=await supa.from('family\_plan').upsert({owner\_id:authUser.id,payload:data,updated\_at:timestamp},{onConflict:'owner\_id'});if(!error)lastSyncedAt=timestamp;if(error)setStatus('Lokale Änderung gespeichert; Cloud-Sync fehlgeschlagen: '+error.message,'err')}
+window.addEventListener('storage',e=\>{if(e.key===K){data=load();render()}});
+window.addEventListener('beforeinstallprompt',e=\>{e.preventDefault();installPrompt=e;const b=document.querySelector('#installBtn');b.hidden=false;b.onclick=async()=\>{installPrompt.prompt();installPrompt=null;b.hidden=true}});
+if('serviceWorker'in navigator)window.addEventListener('load',()=\>navigator.serviceWorker.register('./sw.js').catch(()=\>{}));
 initSync();render();
-/\* Familienkueche Einkaufslisten-Erweiterung 2.0. Am ENDE von app.js einfuegen. \*/
-(function(){
-  const oldApplyPlan=applyPlan;
-  const oldBind=bind;
-  const oldItem=item;
-  const oldShoppingView=shoppingView;
-  const ownKey='familienplan-own-shopping-v2';
-  function ensure(){
-	if(!data.customShopping || typeof data.customShopping!=='object')data.customShopping={categories:[],items:[],quantities:{},removed:[]};
-	const s=data.customShopping;
-	s.categories=Array.isArray(s.categories)?s.categories:[];
-	s.items=Array.isArray(s.items)?s.items:[];
-	s.quantities=s.quantities&&typeof s.quantities==='object'?s.quantities:{};
-	s.removed=Array.isArray(s.removed)?s.removed:[];
+
+/\* Familienkueche: Einkaufsliste 2.0 \*/
+(function () {
+  const originalBind = bind;
+  const originalApplyPlan = applyPlan;
+  const storageKey = 'familienplan-own-shopping-v2';
+  function ensure() {
+	if (!data.customShopping || typeof data.customShopping !== 'object') {
+	  data.customShopping = {categories: [], items: [], quantities: {}, removed: []};
+	}
+	const s = data.customShopping;
+	if (!Array.isArray(s.categories)) s.categories = [];
+	if (!Array.isArray(s.items)) s.items = [];
+	if (!s.quantities || typeof s.quantities !== 'object') s.quantities = {};
+	if (!Array.isArray(s.removed)) s.removed = [];
 	return s;
   }
-  function persist(){localStorage.setItem(ownKey,JSON.stringify(ensure()));save();render()}
-  function migrate(){
-	const s=ensure();
-	try{const saved=JSON.parse(localStorage.getItem(ownKey)||'null');if(saved){
-	  s.categories=[...new Set([...(saved.categories||[]),...s.categories])];
-	  s.items=[...(saved.items||[]),...s.items.filter(x=>!(saved.items||[]).some(y=>y.id===x.id))];
-	  s.quantities={...(saved.quantities||{}),...s.quantities};
-	  s.removed=[...new Set([...(saved.removed||[]),...s.removed])];
-	}}catch{}
-	if(Array.isArray(data.extra)&&data.extra.length){data.extra.forEach((x,i)=>{if(!s.items.some(y=>y.name===x.name&&y.qty===x.qty))s.items.push({id:'legacy-'+Date.now()+'-'+i,name:x.name,qty:x.qty,category:'Eigene Artikel'})});data.extra=[]}
-	localStorage.setItem(ownKey,JSON.stringify(s));save(true);
+  function migrate() {
+	const s = ensure();
+	try {
+	  const old = JSON.parse(localStorage.getItem(storageKey) || 'null');
+	  if (old) {
+	    s.categories = [...new Set([...(old.categories || []), ...s.categories])];
+	    for (const x of old.items || []) if (!s.items.some(y => y.id === x.id)) s.items.push(x);
+	    s.quantities = {...(old.quantities || {}), ...s.quantities};
+	    s.removed = [...new Set([...(old.removed || []), ...s.removed])];
+	  }
+	} catch (e) {}
+	for (const x of data.extra || []) {
+	  if (!s.items.some(y => y.name === x.name && y.qty === x.qty)) {
+	    s.items.push({id: makeId(), name: x.name, qty: x.qty, category: 'Eigene Artikel'});
+	  }
+	}
+	data.extra = [];
+	save(true);
   }
-  const safe=s=\>esc(s);
-  const id=()=\> 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-  function rows(){
-	const s=ensure(),groups={};
-	Object.entries(currentGroceries()).forEach(([cat,items])=>{groups[cat]=items.map(([name,qty],index)=>({key:'g-'+name,name,qty:s.quantities['g-'+name]??qty,cat,custom:false,index})).filter(x=>!s.removed.includes(x.key))});
-	s.categories.forEach(cat=>{if(!groups[cat])groups[cat]=[]});
-	s.items.forEach((x,index)=>{if(!groups[x.category])groups[x.category]=[];groups[x.category].push({key:'x-'+x.id,name:x.name,qty:x.qty,cat:x.category,custom:true,index})});
-	Object.values(groups).forEach(items=>items.sort((a,b)=>Number(data.checked.includes(a.key))-Number(data.checked.includes(b.key))||a.index-b.index));
-	return groups;
+  function makeId() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
+  function persist() { save(); render(); }
+  function groups() {
+	const s = ensure(), out = {};
+	for (const [cat, entries] of Object.entries(currentGroceries())) {
+	  out[cat] = entries.map(([name, qty], index) => ({
+	    key: 'g-' + name, name, qty: s.quantities['g-' + name] ?? qty,
+	    cat, custom: false, index
+	  })).filter(x => !s.removed.includes(x.key));
+	}
+	for (const cat of s.categories) if (!out[cat]) out[cat] = [];
+	for (const [index, x] of s.items.entries()) {
+	  if (!out[x.category]) out[x.category] = [];
+	  out[x.category].push({key: 'x-' + x.id, name: x.name, qty: x.qty, cat: x.category, custom: true, index});
+	}
+	for (const entries of Object.values(out)) {
+	  entries.sort((a,b) => Number(data.checked.includes(a.key)) - Number(data.checked.includes(b.key)) || a.index - b.index);
+	}
+	return out;
   }
-  function categoryOptions(selected){return Object.keys(rows()).map(x=\>`<option value="${safe(x)}" ${x===selected?'selected':''}>${safe(x)}</option>`).join('')}
-  shoppingView=function(){const groups=rows();const total=Object.values(groups).reduce((n,x)=\>n+x.length,0),done=Object.values(groups).flat().filter(x=\>data.checked.includes(x.key)).length;
-	return `<section class="card"><h2>Einkaufsliste</h2><p class="muted">${done} von ${total} Artikeln abgehakt</p><div class="progress"><i style="width:${total?done/total*100:0}%"></i></div><div class="tools"><button id="addItem">+ Artikel</button><button id="addCategory">+ Kategorie</button><button id="clearChecks">Häkchen löschen</button><button id="exportBtn">Liste teilen</button></div>${Object.entries(groups).map(([cat,items])=>`<details class="group" open><summary>${safe(cat)} (${items.length})</summary><ul class="list">${items.map(x=>`<li class="${data.checked.includes(x.key)?'checked':''}"><input type="checkbox" aria-label="${safe(x.name)} abhaken" data-check="${safe(x.key)}" ${data.checked.includes(x.key)?'checked':''}><label>${safe(x.name)}</label><span class="qty">${safe(x.qty)}</span><button class="tiny" data-qty="${safe(x.key)}" aria-label="${safe(x.name)} bearbeiten">✎</button><button class="tiny" data-del="${safe(x.key)}" aria-label="${safe(x.name)} entfernen">×</button></li>`).join('')}</ul></details>`).join('')}<p class="muted">Eigene Artikel und Kategorien bleiben bei einem neuen Wochenplan erhalten. Änderungen werden bei aktiver Anmeldung synchronisiert.</p></section>`};
-  bind=function(){oldBind();
-	document.querySelector('#addItem')?.replaceWith(document.querySelector('#addItem').cloneNode(true));
-	document.querySelector('#addItem')?.addEventListener('click',()=>{const name=prompt('Artikelname:');if(!name?.trim())return;const qty=prompt('Menge:','1 Stück');if(qty===null)return;const cats=Object.keys(rows());const cat=prompt('Kategorie (vorhanden: '+cats.join(', ')+'):',cats[0]||'Sonstiges');if(!cat?.trim())return;const s=ensure();if(!cats.includes(cat.trim())&&!s.categories.includes(cat.trim()))s.categories.push(cat.trim());s.items.push({id:id(),name:name.trim(),qty:qty.trim(),category:cat.trim()});persist()});
-	document.querySelector('#addCategory')?.addEventListener('click',()=>{const cat=prompt('Name der neuen Kategorie:');if(!cat?.trim())return;const s=ensure();if(Object.keys(rows()).includes(cat.trim()))return toast('Kategorie existiert bereits');s.categories.push(cat.trim());persist()});
-	document.querySelectorAll('[data-qty]').forEach(b=>b.addEventListener('click',()=>{const key=b.dataset.qty;const entry=Object.values(rows()).flat().find(x=>x.key===key);if(!entry)return;const qty=prompt('Neue Menge für '+entry.name+':',entry.qty);if(qty===null)return;const s=ensure();if(entry.custom){const x=s.items.find(x=>'x-'+x.id===key);if(x)x.qty=qty.trim()}else s.quantities[key]=qty.trim();persist()}));
-	document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{const key=b.dataset.del;const entry=Object.values(rows()).flat().find(x=>x.key===key);if(!entry||!confirm(entry.name+' entfernen?'))return;const s=ensure();if(entry.custom)s.items=s.items.filter(x=>'x-'+x.id!==key);else s.removed.push(key);data.checked=data.checked.filter(x=>x!==key);persist()}));
+  shoppingView = function () {
+	const grouped = groups();
+	const all = Object.values(grouped).flat();
+	const done = all.filter(x => data.checked.includes(x.key)).length;
+	return `<section class="card"><h2>Einkaufsliste</h2>
+	  <p class="muted">${done} von ${all.length} Artikeln abgehakt</p>
+	  <div class="progress"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div>
+	  <div class="tools"><button id="addItem">+ Artikel</button><button id="addCategory">+ Kategorie</button><button id="clearChecks">Häkchen löschen</button><button id="exportBtn">Liste teilen</button></div>
+	  ${Object.entries(grouped).map(([cat, entries]) => `<details class="group" open><summary>${esc(cat)} (${entries.length})</summary><ul class="list">
+	    ${entries.map(x => `<li class="${data.checked.includes(x.key) ? 'checked' : ''}">
+	      <input type="checkbox" data-check="${esc(x.key)}" aria-label="${esc(x.name)} abhaken" ${data.checked.includes(x.key) ? 'checked' : ''}>
+	      <label>${esc(x.name)}</label><span class="qty">${esc(x.qty)}</span>
+	      <button class="tiny" data-qty="${esc(x.key)}" aria-label="Menge für ${esc(x.name)} bearbeiten">✎</button>
+	      <button class="tiny" data-del="${esc(x.key)}" aria-label="${esc(x.name)} löschen">×</button>
+	    </li>`).join('')}</ul></details>`).join('')}
+	  <p class="muted">Eigene Artikel und Kategorien bleiben beim Wochenwechsel erhalten.</p></section>`;
   };
-  // Export-Button mit korrekter Ausgabe ueberschreiben.
-  const bindWithExport=bind;
-  bind=function(){bindWithExport();const b=document.querySelector('#exportBtn');if(b){const n=b.cloneNode(true);b.replaceWith(n);n.addEventListener('click',async()=\>{const str=Object.entries(rows()).map(([cat,items])=\>cat+'n'+items.map(x=\>'• '+x.name+' — '+x.qty).join('n')).join('nn');try{await navigator.clipboard.writeText(str);toast('Einkaufsliste kopiert')}catch{prompt('Einkaufsliste kopieren:',str)}})}};
-  applyPlan=function(){const before=data,old=ensure();const text=document.querySelector('#planJson').value.trim();let parsed;try{parsed=JSON.parse(text)}catch{return oldApplyPlan()}
-	if(!parsed?.plan||!days.every(d=>Array.isArray(parsed.plan[d])&&parsed.plan[d].length>=3))return oldApplyPlan();
-	const preserved=structuredClone(old);oldApplyPlan();if(data!==before){data.customShopping=preserved;data.checked=[];localStorage.setItem(ownKey,JSON.stringify(preserved));save();render()}
+  bind = function () {
+	originalBind();
+	const add = document.querySelector('#addItem');
+	if (add) {
+	  const replacement = add.cloneNode(true);
+	  add.replaceWith(replacement);
+	  replacement.addEventListener('click', () => {
+	    const name = prompt('Artikelname:'); if (!name?.trim()) return;
+	    const qty = prompt('Menge:', '1 Stück'); if (qty === null) return;
+	    const available = Object.keys(groups());
+	    const cat = prompt('Kategorie (vorhanden: ' + available.join(', ') + '):', available[0] || 'Sonstiges');
+	    if (!cat?.trim()) return;
+	    const s = ensure();
+	    if (!available.includes(cat.trim())) s.categories.push(cat.trim());
+	    s.items.push({id: makeId(), name: name.trim(), qty: qty.trim(), category: cat.trim()});
+	    persist();
+	  });
+	}
+	document.querySelector('#addCategory')?.addEventListener('click', () => {
+	  const cat = prompt('Neue Kategorie:'); if (!cat?.trim()) return;
+	  if (Object.keys(groups()).includes(cat.trim())) return toast('Kategorie existiert bereits');
+	  ensure().categories.push(cat.trim()); persist();
+	});
+	document.querySelectorAll('[data-qty]').forEach(b => b.addEventListener('click', () => {
+	  const key = b.dataset.qty, entry = Object.values(groups()).flat().find(x => x.key === key);
+	  if (!entry) return;
+	  const qty = prompt('Neue Menge für ' + entry.name + ':', entry.qty);
+	  if (qty === null) return;
+	  const s = ensure();
+	  if (entry.custom) { const x = s.items.find(x => 'x-' + x.id === key); if (x) x.qty = qty.trim(); }
+	  else s.quantities[key] = qty.trim();
+	  persist();
+	}));
+	document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+	  const key = b.dataset.del, entry = Object.values(groups()).flat().find(x => x.key === key);
+	  if (!entry || !confirm(entry.name + ' entfernen?')) return;
+	  const s = ensure();
+	  if (entry.custom) s.items = s.items.filter(x => 'x-' + x.id !== key);
+	  else if (!s.removed.includes(key)) s.removed.push(key);
+	  data.checked = data.checked.filter(x => x !== key);
+	  persist();
+	}));
+	const exportBtn = document.querySelector('#exportBtn');
+	if (exportBtn) {
+	  const replacement = exportBtn.cloneNode(true);
+	  exportBtn.replaceWith(replacement);
+	  replacement.addEventListener('click', async () => {
+	    const content = Object.entries(groups()).map(([cat, entries]) => cat + '\n' + entries.map(x => '• ' + x.name + ' — ' + x.qty).join('\n')).join('\n\n');
+	    try { await navigator.clipboard.writeText(content); toast('Einkaufsliste kopiert'); }
+	    catch (e) { prompt('Einkaufsliste kopieren:', content); }
+	  });
+	}
   };
-  document.querySelector('#applyPlan').onclick=applyPlan;
-  migrate();render();
+  applyPlan = function () {
+	const before = data, preserved = structuredClone(ensure());
+	originalApplyPlan();
+	if (data !== before) {
+	  data.customShopping = preserved;
+	  data.checked = [];
+	  // Wochenplan-Mengen gelten wieder neu; selbst angelegte Artikel und Kategorien bleiben.
+	  data.customShopping.quantities = {};
+	  data.customShopping.removed = [];
+	  save(); render();
+	}
+  };
+  document.querySelector('#applyPlan').onclick = applyPlan;
+  migrate(); render();
 })();
-
